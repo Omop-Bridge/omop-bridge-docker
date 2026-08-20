@@ -1,1 +1,3 @@
 /.idea/
+/dockerImage/
+/faiss_indexes/

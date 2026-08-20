@@ -1,6 +1,6 @@
 services:
   omop-bridge-db:
-    image: omop-bridge-db:latest
+    image: omop-bridge-db:local
     container_name: omop-bridge-db
     restart: unless-stopped
     command: postgres -c max_connections=200
@@ -26,7 +26,7 @@ services:
       - omop-bridge-network
 
   backend:
-    image: omop-bridge-backend:latest
+    image: omop-bridge-backend:local
     container_name: omop-bridge-backend
     restart: unless-stopped
     env_file: .env
@@ -35,6 +35,7 @@ services:
       TARGET_DB_PORT: 5432
       R_RUNNER_URL: http://r-runner:8001
       HF_TOKEN: ${HF_TOKEN}
+      FAISS_INDEX_DIR: /app/data/faiss_indexes
     extra_hosts:
       - "localhost:host-gateway"
     dns:
@@ -44,14 +45,14 @@ services:
       omop-bridge-db:
         condition: service_healthy
     volumes:
-      - ./backend:/app
       - uploads:/app/uploads
       - dqd_results:/results
+      - ./faiss_indexes:/app/data/faiss_indexes
     networks:
       - omop-bridge-network
 
   r-runner:
-    image: omop-bridge-r-runner:latest
+    image: omop-bridge-r-runner:local
     container_name: omop-bridge-r-runner
     restart: unless-stopped
     ports:
@@ -90,21 +91,18 @@ services:
       - omop-bridge-network
 
   frontend:
-    image: omop-bridge-frontend:latest
+    image: omop-bridge-frontend:local
     container_name: omop-bridge-frontend
     restart: unless-stopped
     environment:
       VITE_API_BASE_URL: ""
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
     networks:
       - omop-bridge-network
 
   atlas3-webapi:
-    image: atlas3-webapi:latest
+    image: atlas3-webapi:local
     container_name: omop-bridge-atlas3-webapi
     platform: linux/amd64
     restart: unless-stopped
@@ -174,7 +172,7 @@ services:
       atlas3-webapi:
         condition: service_healthy
     volumes:
-      - ./omop_bridge_ddl/post-webapi-ddl:/scripts
+      - ./post-webapi-ddl:/scripts
     command: >
       sh -c "echo 'WebAPI is up and healthy. Executing post-startup SQL scripts from /scripts...' &&
              until pg_isready -h omop-bridge-db -p 5432 -U omop; do sleep 2; done &&
