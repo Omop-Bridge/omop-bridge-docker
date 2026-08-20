@@ -2,7 +2,7 @@
 set -e
 
 echo "Loading all OMOP Bridge infrastructure and application images..."
-cd dockerImage
+cd "$(dirname "$0")/../dockerImage"
 
 # Custom OMOP Bridge Images
 [ -f "OMOPBridge_DB.tar.gz" ] && gunzip -c OMOPBridge_DB.tar.gz | docker load
