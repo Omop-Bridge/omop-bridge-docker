@@ -7,6 +7,9 @@ on:
 jobs:
   test-all-services:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
 
     steps:
       - name: Checkout Code
