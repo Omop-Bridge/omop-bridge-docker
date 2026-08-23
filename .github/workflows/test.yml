@@ -39,6 +39,11 @@ jobs:
           echo "FRONTEND_IMAGE=ghcr.io/omop-bridge/omop-bridge/omop-bridge-frontend:latest" >> .env
           echo "WEBAPI_IMAGE=ghcr.io/omop-bridge/omop-bridge/atlas3-webapi:latest" >> .env
 
+      - name: Free Up Disk Space on Runner
+        run: |
+            sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+            docker system prune -a -f --volumes
+            df -h
       - name: Pull and Start All Services
         run: |
           docker compose pull
