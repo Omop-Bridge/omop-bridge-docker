@@ -1,6 +1,6 @@
 services:
   omop-bridge-db:
-    image: omop-bridge-db:local
+    image: ${DB_IMAGE:-omop-bridge-db:local}
     container_name: omop-bridge-db
     restart: unless-stopped
     command: postgres -c max_connections=200
@@ -26,7 +26,7 @@ services:
       - omop-bridge-network
 
   backend:
-    image: omop-bridge-backend:local
+    image: ${BACKEND_IMAGE:-omop-bridge-backend:local}
     container_name: omop-bridge-backend
     restart: unless-stopped
     env_file: .env
@@ -52,7 +52,7 @@ services:
       - omop-bridge-network
 
   r-runner:
-    image: omop-bridge-r-runner:local
+    image: ${R_RUNNER_IMAGE:-omop-bridge-r-runner:local}
     container_name: omop-bridge-r-runner
     restart: unless-stopped
     ports:
@@ -91,7 +91,7 @@ services:
       - omop-bridge-network
 
   frontend:
-    image: omop-bridge-frontend:local
+    image: ${FRONTEND_IMAGE:-omop-bridge-frontend:local}
     container_name: omop-bridge-frontend
     restart: unless-stopped
     environment:
@@ -102,7 +102,7 @@ services:
       - omop-bridge-network
 
   atlas3-webapi:
-    image: atlas3-webapi:local
+    image: ${WEBAPI_IMAGE:-atlas3-webapi:local}
     container_name: omop-bridge-atlas3-webapi
     platform: linux/amd64
     restart: unless-stopped

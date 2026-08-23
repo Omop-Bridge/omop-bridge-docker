@@ -1,0 +1,93 @@
+name: OMOP Bridge CI/CD Tests
+
+on:
+  pull_request:
+    branches: ["master" ]
+
+jobs:
+  test-all-services:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Environment File (.env)
+        run: |
+          echo "HF_TOKEN=${{ secrets.HF_TOKEN }}" >> .env
+          echo "TARGET_DB_USER=omop" >> .env
+          echo "TARGET_DB_PASSWORD=omop" >> .env
+          echo "TARGET_DB_NAME=omop_cdm" >> .env
+          
+          # Map custom core services to GHCR images
+          echo "DB_IMAGE=ghcr.io/omop-bridge/omop-bridge/omop-bridge-db:latest" >> .env
+          echo "BACKEND_IMAGE=ghcr.io/omop-bridge/omop-bridge/omop-bridge-backend:latest" >> .env
+          echo "R_RUNNER_IMAGE=ghcr.io/omop-bridge/omop-bridge/omop-bridge-r-runner:latest" >> .env
+          echo "FRONTEND_IMAGE=ghcr.io/omop-bridge/omop-bridge/omop-bridge-frontend:latest" >> .env
+          echo "WEBAPI_IMAGE=ghcr.io/omop-bridge/omop-bridge/atlas3-webapi:latest" >> .env
+
+      - name: Pull and Start All Services
+        run: |
+          docker compose pull
+          docker compose up -d
+
+      - name: Wait for Core Infrastructure & WebAPI Health
+        run: |
+          echo "Waiting for PostgreSQL database container..."
+          timeout 60s bash -c 'until docker inspect -f "{{.State.Health.Status}}" omop-bridge-db | grep -q "healthy"; do sleep 3; done'
+          
+          echo "Waiting for Atlas WebAPI container..."
+          timeout 90s bash -c 'until docker inspect -f "{{.State.Health.Status}}" omop-bridge-atlas3-webapi | grep -q "healthy"; do sleep 5; done'
+
+      - name: Verify WebAPI Initialization Job (`webapi-init`)
+        run: |
+          echo "Waiting for webapi-init container to complete execution..."
+          timeout 60s bash -c 'until [ "$(docker inspect -f "{{.State.Status}}" omop-bridge-webapi-init)" = "exited" ]; do sleep 3; done'
+          
+          # Check exit code of the initializer container
+          EXIT_CODE=$(docker inspect -f "{{.State.ExitCode}}" omop-bridge-webapi-init)
+          if [ "$EXIT_CODE" -eq 0 ]; then
+            echo "SUCCESS: webapi-init scripts executed successfully!"
+          else
+            echo "ERROR: webapi-init failed with exit code $EXIT_CODE"
+            docker logs omop-bridge-webapi-init
+            exit 1
+          fi
+
+      - name: Run Diagnostics & Service Validation for All Components
+        run: |
+          echo "=== 1. Container Status Overview ==="
+          docker compose ps
+
+          echo "=== 2. Database Connection Check ==="
+          docker exec omop-bridge-db pg_isready -U omop
+
+          echo "=== 3. WebAPI Info Endpoint Check ==="
+          curl -f http://localhost:8080/WebAPI/info
+
+          echo "=== 4. Checking Monitoring & Infrastructure Logs ==="
+          echo "--- Prometheus Logs ---"
+          docker logs --tail 20 omop-bridge-prometheus || true
+          echo "--- Grafana Logs ---"
+          docker logs --tail 20 omop-bridge-grafana || true
+          echo "--- Loki Logs ---"
+          docker logs --tail 20 omop-bridge-loki || true
+          echo "--- Nginx Logs ---"
+          docker logs --tail 20 omop-bridge-nginx || true
+          echo "--- DbGate Logs ---"
+          docker logs --tail 20 dbgate || true
+
+      - name: Tear Down Stack and Volumes
+        if: always()
+        run: |
+          docker compose down -v
