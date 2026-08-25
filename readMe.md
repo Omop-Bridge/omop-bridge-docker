@@ -46,17 +46,16 @@ Before deploying, ensure that:
 cd omop-bridge-docker
 ```
 
-#### 2. Configure the `.env` File
+#### 2. Configure the .env File
 
-Ensure that all required environment variables, connection parameters, service configuration values, and database credentials are correctly defined.
+OMOP Bridge includes a sample environment configuration file named .env.sample. Create your deployment-specific .env file by copying it:
 
-For example:
 
 ```bash
-nano .env
+cp .env.sample .env
 ```
 
-> **Important:** Do not commit production `.env` files containing passwords or other sensitive credentials to source control.
+> **Important:** Then review and update the .env file with the appropriate environment variables, connection parameters, service configuration values, and database credentials for your deployment:
 
 #### 3. Pull and Start the Stack
 
