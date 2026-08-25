@@ -1,43 +1,46 @@
-# OMOP Bridge - Offline Deployment and Upgrade Guide
+# OMOP Bridge - Deployment and Upgrade Guide
 
-This guide explains how to deploy and upgrade **OMOP Bridge** in an offline environment using the provided deployment scripts.
-
-The deployment package includes pre-built Docker images that can be loaded directly into the local Docker engine without requiring internet access.
+This guide explains how to deploy and upgrade **OMOP Bridge** in both **online environments**, where container images are pulled from registries, and **offline environments**, where pre-packaged Docker image archives are used.
 
 ## 📋 Table of Contents
 
-1. [Initial Deployment](#-initial-deployment-load_and_runsh)
-2. [Performing Upgrades](#-performing-upgrades-upgradesh)
-3. [Data Persistence](#-data-persistence)
-4. [Troubleshooting and Verification](#-troubleshooting--verification)
+1. [Deployment Options](#-deployment-options)
+2. [Online Deployment](#-online-deployment-public-registries)
+3. [Offline Deployment](#-offline-deployment-load_and_runsh)
+4. [Performing Upgrades](#-performing-upgrades-upgradesh)
+5. [Data Persistence](#-data-persistence)
+6. [Troubleshooting and Verification](#-troubleshooting-and-verification)
+7. [Typical Deployment Structure](#-typical-deployment-structure)
+8. [Quick Reference](#-quick-reference)
 
 ---
 
-## 🚀 Initial Deployment (`load_and_run.sh`)
+## 🌐 Deployment Options
 
-Use the `load_and_run.sh` script when setting up OMOP Bridge on a **fresh offline server for the first time**.
+OMOP Bridge supports two primary deployment pathways depending on the network configuration of your server:
 
-The script automatically:
+* **Online Deployment** — Pulls the required container images directly from configured Docker registries.
+* **Offline Deployment** — Loads pre-packaged container image archives locally, making it suitable for isolated or air-gapped infrastructure.
 
-1. Locates the compressed Docker image archives.
-2. Unpacks the provided `.tar.gz` image files.
-3. Loads the container images into the local Docker engine.
-4. Starts the OMOP Bridge Docker Compose stack from the project root.
+---
+
+## 🚀 Online Deployment (Public Registries)
+
+Use online deployment when the target server has internet access and can pull the required container images from the configured registries.
 
 ### Prerequisites
 
-Before starting, ensure that:
+Before deploying, ensure that:
 
-- Docker Engine is installed and running.
-- Docker Compose is available.
-- All required container image archives are available in the `dockerImage/` directory.
-- The `.env` file is properly configured.
+* Docker Engine is installed and running.
+* Docker Compose is available.
+* The required container registries are accessible.
+* You are authenticated with any private container registry, if required.
+* A properly configured `.env` file exists in the project root.
 
 ### Deployment Steps
 
 #### 1. Navigate to the Project Root
-
-Open a terminal and navigate to the OMOP Bridge deployment directory:
 
 ```bash
 cd omop-bridge-docker
@@ -45,20 +48,82 @@ cd omop-bridge-docker
 
 #### 2. Configure the `.env` File
 
-Ensure that the `.env` file in the project root contains the correct environment configuration before deployment.
+Ensure that all required environment variables, connection parameters, service configuration values, and database credentials are correctly defined.
 
 For example:
 
-```text
-DATABASE_HOST=omop-db
-DATABASE_PORT=5432
+```bash
+nano .env
 ```
 
-> **Important:** Review all environment variables and passwords before starting the stack.
+> **Important:** Do not commit production `.env` files containing passwords or other sensitive credentials to source control.
 
-#### 3. Make the Script Executable
+#### 3. Pull and Start the Stack
 
-This step is only required the first time:
+Start OMOP Bridge in detached mode:
+
+```bash
+docker compose up -d
+```
+
+Docker Compose will pull any required images that are not already available locally and then start the services.
+
+#### 4. Verify the Deployment
+
+```bash
+docker compose ps
+```
+
+All expected services should show as running or healthy, depending on the configured health checks.
+
+---
+
+## 📴 Offline Deployment (`load_and_run.sh`)
+
+Use the `load_and_run.sh` script when installing OMOP Bridge on a **fresh offline or air-gapped server** for the first time.
+
+This deployment method uses pre-packaged Docker image archives stored locally instead of downloading images from a registry.
+
+The script automatically:
+
+1. Locates the compressed Docker image archives.
+2. Unpacks the provided `.tar.gz` files.
+3. Loads the Docker images into the local Docker engine.
+4. Starts the OMOP Bridge Docker Compose stack.
+
+### Prerequisites
+
+Ensure that the following are available:
+
+* Docker Engine is installed and running.
+* Docker Compose is available.
+* All required container image archives are present in the `dockerImage/` directory.
+* The `.env` file is correctly configured.
+
+### Deployment Steps
+
+#### 1. Navigate to the Project Root
+
+```bash
+cd omop-bridge-docker
+```
+
+#### 2. Verify the Offline Image Packages
+
+Confirm that the required image archives are available:
+
+```text
+dockerImage/
+├── omop-bridge-backend.tar.gz
+├── omop-bridge-frontend.tar.gz
+├── omop-bridge-db.tar.gz
+├── omop-bridge-r-runner.tar.gz
+└── omop-bridge-atlas3-webapi.tar.gz
+```
+
+#### 3. Make the Deployment Script Executable
+
+This is required the first time the script is used:
 
 ```bash
 chmod +x scripts/load_and_run.sh
@@ -66,77 +131,48 @@ chmod +x scripts/load_and_run.sh
 
 #### 4. Run the Deployment Script
 
-From the project root, run:
-
 ```bash
 ./scripts/load_and_run.sh
 ```
 
-The script will load the supplied container images and start the OMOP Bridge services.
-
-### Verify the Deployment
-
-After the script completes, check the status of the containers:
+Once the script completes, verify the running services:
 
 ```bash
 docker compose ps
 ```
 
-All required services should show as running or healthy, depending on their configured health checks.
-
 ---
 
 ## 🔄 Performing Upgrades (`upgrade.sh`)
 
-When new OMOP Bridge image updates, patches, or releases are shipped to your offline environment, use the `upgrade.sh` script.
+When new OMOP Bridge releases, patches, or updated container images are available, use the `upgrade.sh` script to update the deployment.
 
-The upgrade process replaces the application container images while preserving persistent data.
+The upgrade process is designed to replace application container images while preserving persistent Docker volumes containing important application and database data.
 
-> **Important:** The upgrade script safely stops active containers and removes old image layers **without deleting persistent Docker volumes**.
+### Upgrade Process
 
-In particular, the persistent database volume:
+#### 1. Obtain the Updated Images
 
-```text
-omopbridge_db_data
+For an **online deployment**, pull the latest configured image versions:
+
+```bash
+docker compose pull
 ```
 
-is preserved.
-
-This ensures that important data remains intact, including:
-
-- Clinical records
-- OMOP CDM data
-- Athena vocabulary data
-- Concept mappings
-- Study data
-- Other persistent database content
-
-### Upgrade Steps
-
-#### 1. Replace the Docker Image Archives
-
-Copy the newly supplied `.tar.gz` image files into:
+For an **offline deployment**, replace the existing image archives in the `dockerImage/` directory with the new release packages:
 
 ```text
 dockerImage/
+├── omop-bridge-backend.tar.gz
+├── omop-bridge-frontend.tar.gz
+├── omop-bridge-db.tar.gz
+├── omop-bridge-r-runner.tar.gz
+└── omop-bridge-atlas3-webapi.tar.gz
 ```
-
-Replace the older image archives with the new versions.
-
-For example:
-
-```text
-omop-bridge-backend.tar.gz
-omop-bridge-frontend.tar.gz
-omop-bridge-db.tar.gz
-omop-bridge-r-runner.tar.gz
-```
-
-> **Important:** Ensure the new image archives match the filenames or naming conventions expected by the upgrade script.
 
 #### 2. Make the Upgrade Script Executable
 
-This is only required the first time:
+This is required only the first time:
 
 ```bash
 chmod +x scripts/upgrade.sh
@@ -144,47 +180,45 @@ chmod +x scripts/upgrade.sh
 
 #### 3. Run the Upgrade
 
-From the project root, execute:
-
 ```bash
 ./scripts/upgrade.sh
 ```
 
-The script will typically:
+The script should update the application containers while retaining configured persistent volumes.
 
-1. Stop the currently running OMOP Bridge containers.
-2. Remove outdated container images.
-3. Load the newly supplied images.
-4. Preserve persistent Docker volumes.
-5. Start the updated OMOP Bridge stack.
+#### 4. Verify the Upgrade
+
+```bash
+docker compose ps
+```
+
+You can also inspect the service logs:
+
+```bash
+docker compose logs -f
+```
 
 ---
 
 ## 💾 Data Persistence
 
-OMOP Bridge uses Docker volumes to preserve important data independently of individual containers.
+OMOP Bridge uses Docker volumes to persist important data independently of the lifecycle of individual containers.
 
-The upgrade process is designed **not to delete persistent volumes**.
+Examples of persistent volumes include:
 
-For example, the following volume should remain intact:
+* `omopbridge_db_data`
+* `atlas3-webapi-data`
+* `dqd_results`
 
-```text
-omopbridge_db_data
-```
+This means that stopping, recreating, or upgrading application containers should not remove data stored in these volumes.
 
-You can check existing Docker volumes with:
+> **Warning:** Do not run `docker compose down -v` unless you intentionally want to remove persistent Docker volumes. This operation can permanently delete stored database, OMOP CDM, application, and results data.
+
+To view available Docker volumes:
 
 ```bash
 docker volume ls
 ```
-
-To inspect the database volume:
-
-```bash
-docker volume inspect omopbridge_db_data
-```
-
-> **Warning:** Do not run commands such as `docker compose down -v` unless you intentionally want to remove persistent volumes and permanently delete stored data.
 
 ---
 
@@ -192,82 +226,67 @@ docker volume inspect omopbridge_db_data
 
 ### Check Running Containers
 
-Verify that all OMOP Bridge services started successfully:
-
 ```bash
 docker compose ps
 ```
 
-This command displays the status of each service.
-
-### View All Container Logs
-
-To inspect logs from all services:
+### View Logs for All Services
 
 ```bash
 docker compose logs -f
 ```
 
-### View Backend Logs
+### View Logs for a Specific Service
 
-If the backend fails to start or is waiting for a database health check:
+For the backend:
 
 ```bash
 docker compose logs -f backend
 ```
 
-### View Database Logs
-
-To inspect database startup issues:
+For the OMOP Bridge database:
 
 ```bash
-docker compose logs -f omop-db
+docker compose logs -f omop-bridge-db
 ```
-
-### Restart the Stack
-
-If the images are already loaded and you simply need to restart the services:
-
-```bash
-docker compose restart
-```
-
-Alternatively, stop and start the stack:
-
-```bash
-docker compose down
-docker compose up -d
-```
-
-> This command preserves volumes as long as the `-v` option is not used.
 
 ### Check Loaded Docker Images
-
-Verify that the offline images were successfully loaded:
-
-```bash
-docker images
-```
-
-You can filter for OMOP Bridge images:
 
 ```bash
 docker images | grep omop-bridge
 ```
 
-### Check Database Volume
-
-Confirm that the persistent database volume still exists:
+### Check Docker Volumes
 
 ```bash
-docker volume ls | grep omopbridge_db_data
+docker volume ls
+```
+
+### Restart the Stack
+
+If services need to be restarted:
+
+```bash
+docker compose restart
+```
+
+### Stop the Stack Without Removing Data
+
+```bash
+docker compose down
+```
+
+Because the `-v` option is not used, persistent Docker volumes are retained.
+
+### Start the Stack Again
+
+```bash
+docker compose up -d
 ```
 
 ---
 
-## 📦 Typical Offline Deployment Structure
-
-Your deployment package should have a structure similar to:
+## 📦 Typical Deployment Structure
 
 ```text
 omop-bridge-docker/
@@ -284,25 +303,34 @@ omop-bridge-docker/
     └── upgrade.sh
 ```
 
+---
+
 ## 📌 Quick Reference
 
-| Task | Command |
-|---|---|
-| Initial deployment | `./scripts/load_and_run.sh` |
-| Upgrade installation | `./scripts/upgrade.sh` |
-| Check services | `docker compose ps` |
-| View all logs | `docker compose logs -f` |
-| View backend logs | `docker compose logs -f backend` |
-| List images | `docker images` |
-| List volumes | `docker volume ls` |
+| Task                       | Command                          |
+| -------------------------- | -------------------------------- |
+| Online deployment          | `docker compose up -d`           |
+| Pull updated images        | `docker compose pull`            |
+| Offline deployment         | `./scripts/load_and_run.sh`      |
+| Upgrade installation       | `./scripts/upgrade.sh`           |
+| Check services             | `docker compose ps`              |
+| View all logs              | `docker compose logs -f`         |
+| View backend logs          | `docker compose logs -f backend` |
+| List Docker images         | `docker images`                  |
+| List Docker volumes        | `docker volume ls`               |
+| Restart services           | `docker compose restart`         |
+| Stop without deleting data | `docker compose down`            |
 
-## ⚠️ Important Notes
+---
 
-- Always run the deployment and upgrade scripts from the project root.
-- Ensure the `.env` file is configured before deployment.
-- Keep the `dockerImage/` directory updated with the correct image archives.
-- Do not manually delete `omopbridge_db_data` unless you intend to permanently remove the stored database data.
-- Avoid using `docker compose down -v` during normal upgrades.
-- Verify container health after every deployment or upgrade.
+## ⚠️ Important Operational Notes
 
-With this workflow, OMOP Bridge can be installed and upgraded reliably on servers with limited or no internet connectivity.
+* Always back up critical production data before performing major upgrades.
+* Verify that the `.env` file is compatible with the new release before upgrading.
+* For offline deployments, ensure all image archives belong to the same OMOP Bridge release.
+* Do not delete Docker volumes unless you explicitly intend to remove persistent application data.
+* After deployment or upgrade, verify service status and inspect logs for startup or migration errors.
+
+## License
+
+Refer to the OMOP Bridge project license for licensing and usage information.
