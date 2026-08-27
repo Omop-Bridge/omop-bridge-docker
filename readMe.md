@@ -7,7 +7,7 @@ This guide explains how to deploy and upgrade **OMOP Bridge** in both **online e
 1. [Deployment Options](#deployment-options)
 2. [Online Deployment](#online-deployment-public-registries)
 3. [Offline Deployment](#offline-deployment-load_and_runsh)
-4. [Accessing OMOP Bridge](#accessing-omop-bridge)
+4. [Accessing OMOP Bridge and Services](#accessing-omop-bridge-and-services)
 5. [Default Login Credentials](#default-login-credentials)
 6. [Performing Upgrades](#performing-upgrades-upgradesh)
 7. [Data Persistence](#data-persistence)
@@ -15,6 +15,7 @@ This guide explains how to deploy and upgrade **OMOP Bridge** in both **online e
 9. [Typical Deployment Structure](#typical-deployment-structure)
 10. [Quick Reference](#quick-reference)
 11. [Operational Notes](#important-operational-notes)
+12. [License](#license)
 
 ---
 
@@ -54,7 +55,7 @@ cd omop-bridge-docker
 OMOP Bridge includes a sample environment configuration file named `.env.sample`. Create your deployment-specific `.env` file:
 
 ```bash
-cp .env.sample .env
+cp .env.sample .env && sed -i "s/JWT_SECRET_KEY=.*/JWT_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')/g" .env
 ```
 
 Review and update `.env` with the appropriate:
@@ -65,7 +66,7 @@ Review and update `.env` with the appropriate:
 - Database credentials
 - Other deployment-specific settings
 
-> **Important:** Do not commit production credentials or other sensitive values to source control.
+> **Important:** Never commit production credentials, API keys, JWT secrets, or other sensitive values to source control.
 
 #### 3. Pull and Start the Stack
 
@@ -153,13 +154,16 @@ docker compose ps
 
 ---
 
-## 🌐 Accessing OMOP Bridge
+## 🌐 Accessing OMOP Bridge and Services
 
-Once the deployment stack is successfully running, access OMOP Bridge through a web browser:
+Once the deployment stack is successfully running, you can access the core application and its accompanying monitoring and analytics services through your web browser:
 
-```text
-http://localhost
-```
+| Service | Access URL |
+|---|---|
+| **OMOP Bridge Main App** | `http://localhost` |
+| **ATLAS Analytics** | `http://localhost/atlas/` |
+| **Grafana Dashboards** | `http://localhost/grafana` |
+| **Database Manager (DbGate)** | `http://localhost/db/` |
 
 For remote deployments, replace `localhost` with the server's hostname, domain name, or IP address as appropriate.
 
@@ -167,14 +171,15 @@ For remote deployments, replace `localhost` with the server's hostname, domain n
 
 ## 🔑 Default Login Credentials
 
-Use the following default administrator credentials to log into the platform for the first time:
+Use the following default administrator credentials to log into the platform components for the first time:
 
-| Field | Default |
-|---|---|
-| Username | `admin@omopbridge` |
-| Password | `admin` |
+| Service | Username | Password |
+|---|---|---|
+| **OMOP Bridge** | `admin@omopbridge` | `admin` |
+| **ATLAS Analytics** | `admin` | `admin` |
+| **Grafana Monitoring** | `admin` | `admin` |
 
-> **Security Note:** Change the default administrator password immediately after the initial login, especially in production environments.
+> **Security Note:** Change all default administrator passwords immediately after your initial login, especially in production environments.
 
 ---
 
@@ -269,13 +274,11 @@ Stopping, recreating, or upgrading containers should not remove data stored in t
 
 ### ⚠️ Important Volume Warning
 
-Do **not** run:
+**Do not run the following command unless you intentionally want to remove persistent Docker volumes:**
 
 ```bash
 docker compose down -v
 ```
-
-unless you intentionally want to remove persistent Docker volumes.
 
 The `-v` option can permanently delete stored database, OMOP CDM, application, and results data.
 
@@ -303,13 +306,13 @@ docker compose logs -f
 
 ### View Logs for a Specific Service
 
-Backend:
+**Backend:**
 
 ```bash
 docker compose logs -f backend
 ```
 
-OMOP Bridge database:
+**OMOP Bridge database:**
 
 ```bash
 docker compose logs -f omop-bridge-db
@@ -384,10 +387,14 @@ omop-bridge-docker/
 
 ## 📌 Quick Reference
 
-| Task | Command |
+| Task | Command / Detail |
 |---|---|
 | Platform URL | `http://localhost` |
-| Default Login | `admin@omopbridge` / `admin` |
+| ATLAS URL | `http://localhost/atlas/` |
+| Grafana URL | `http://localhost/grafana` |
+| Default Login (Bridge) | `admin@omopbridge` / `admin` |
+| Default Login (ATLAS) | `admin` / `admin` |
+| Default Login (Grafana) | `admin` / `admin` |
 | Online deployment | `docker compose up -d` |
 | Pull updated images | `docker compose pull` |
 | Offline deployment | `./scripts/load_and_run.sh` |
@@ -412,8 +419,9 @@ omop-bridge-docker/
 - Avoid `docker compose down -v` in production unless volume deletion is intentional.
 - Ensure sufficient disk space is available before loading new offline image archives.
 - After deployment or upgrade, verify service status and inspect logs for startup or migration errors.
-- Change the default administrator password immediately after the first login.
-- For production deployments, use appropriate network security controls, credentials, backups, and TLS/HTTPS configuration.
+- Change default administrator passwords for OMOP Bridge, ATLAS, and Grafana immediately after the first login.
+- For production deployments, use appropriate network security controls, strong credentials, backups, and TLS/HTTPS configuration.
+- Never commit `.env` files containing production secrets to source control.
 
 ---
 
