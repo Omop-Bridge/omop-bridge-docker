@@ -72,6 +72,8 @@ Review and update `.env` with the appropriate:
 
 Start OMOP Bridge in detached mode:
 
+
+
 ```bash
 docker compose up -d
 ```
@@ -85,8 +87,6 @@ docker compose ps
 ```
 
 All expected services should show as **running** or **healthy**, depending on the configured health checks.
-
----
 
 ## 📴 Offline Deployment (`load_and_run.sh`)
 
@@ -123,18 +123,22 @@ cd omop-bridge-docker
 
 Confirm that the required image archives are available:
 
-```text
+Plaintext
+
+
 dockerImage/
 ├── omop-bridge-backend.tar.gz
 ├── omop-bridge-frontend.tar.gz
 ├── omop-bridge-db.tar.gz
 ├── omop-bridge-r-runner.tar.gz
 └── omop-bridge-atlas3-webapi.tar.gz
-```
+
 
 #### 3. Make the Deployment Script Executable
 
 This is required the first time the script is used:
+
+
 
 ```bash
 chmod +x scripts/load_and_run.sh
@@ -158,30 +162,26 @@ docker compose ps
 
 Once the deployment stack is successfully running, you can access the core application and its accompanying monitoring and analytics services through your web browser:
 
-| Service | Access URL |
-|---|---|
-| **OMOP Bridge Main App** | `http://localhost` |
-| **ATLAS Analytics** | `http://localhost/atlas/` |
-| **Grafana Dashboards** | `http://localhost/grafana` |
-| **Database Manager (DbGate)** | `http://localhost/db/` |
+| **Service**                   | **Access URL**             |
+| ----------------------------- | -------------------------- |
+| **OMOP Bridge Main App**      | `http://localhost`         |
+| **ATLAS Analytics**           | `http://localhost/atlas/`  |
+| **Grafana Dashboards**        | `http://localhost/grafana` |
+| **Database Manager (DbGate)** | `http://localhost/db/`     |
 
 For remote deployments, replace `localhost` with the server's hostname, domain name, or IP address as appropriate.
-
----
 
 ## 🔑 Default Login Credentials
 
 Use the following default administrator credentials to log into the platform components for the first time:
 
-| Service | Username | Password |
-|---|---|---|
-| **OMOP Bridge** | `admin@omopbridge` | `admin` |
-| **ATLAS Analytics** | `admin` | `admin` |
-| **Grafana Monitoring** | `admin` | `admin` |
+| **Service**            | **Username**       | **Password** |
+| ---------------------- | ------------------ | ------------ |
+| **OMOP Bridge**        | `admin@omopbridge` | `admin`      |
+| **ATLAS Analytics**    | `admin`            | `admin`      |
+| **Grafana Monitoring** | `admin`            | `admin`      |
 
 > **Security Note:** Change all default administrator passwords immediately after your initial login, especially in production environments.
-
----
 
 ## 🔄 Performing Upgrades (`upgrade.sh`)
 
@@ -201,9 +201,31 @@ Before performing an upgrade:
 
 ### Upgrade Process
 
-#### 1. Obtain the Updated Images
+#### 1. Update the Repository Code
 
-For an **online deployment**, pull the latest configured image versions:
+Pull the latest changes from the version control system:
+
+
+
+```bash
+ git pull
+```
+
+#### 2. Sync Configuration Changes (`.env.sample` to `.env`)
+
+New releases may introduce required configuration parameters in .env.sample. Compare the updated .env.sample with your existing .env file and add any newly introduced environment variables while preserving your existing configuration values.
+
+```bash
+grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env.sample | while IFS= read -r line; do
+    key="${line%%=*}"
+    if ! grep -qE "^${key}=" .env; then
+        echo "$line" >> .env
+    fi
+done
+```
+
+After running the command, manually cross-check .env against the updated .env.sample to confirm that all newly introduced variables have been added correctly and that your existing local configuration values have not been overwritten or changed.
+#### 3. Obtain the Updated Images
 
 ```bash
 docker compose pull
@@ -211,7 +233,9 @@ docker compose pull
 
 For an **offline deployment**, replace the existing image archives in the `dockerImage/` directory with the image packages for the new release:
 
-```text
+Plaintext
+
+```
 dockerImage/
 ├── omop-bridge-backend.tar.gz
 ├── omop-bridge-frontend.tar.gz
@@ -222,7 +246,7 @@ dockerImage/
 
 Ensure that all archives belong to the **same OMOP Bridge release**.
 
-#### 2. Make the Upgrade Script Executable
+#### 4. Make the Upgrade Script Executable
 
 This is required only the first time:
 
@@ -230,7 +254,7 @@ This is required only the first time:
 chmod +x scripts/upgrade.sh
 ```
 
-#### 3. Run the Upgrade
+#### 5. Run the Upgrade
 
 ```bash
 ./scripts/upgrade.sh
@@ -238,7 +262,7 @@ chmod +x scripts/upgrade.sh
 
 The script updates the application containers while retaining configured persistent volumes.
 
-#### 4. Verify the Upgrade
+#### 6. Verify the Upgrade
 
 Check the service status:
 
@@ -370,6 +394,7 @@ After starting or upgrading the stack:
 omop-bridge-docker/
 ├── docker-compose.yml
 ├── .env
+├── .env.sample
 ├── dockerImage/
 │   ├── omop-bridge-backend.tar.gz
 │   ├── omop-bridge-frontend.tar.gz
@@ -379,6 +404,7 @@ omop-bridge-docker/
 └── scripts/
     ├── load_and_run.sh
     └── upgrade.sh
+
 ```
 
 > **Note:** The `dockerImage/` directory is primarily required for offline deployments. Online deployments pull images directly from the configured registries.
@@ -387,25 +413,27 @@ omop-bridge-docker/
 
 ## 📌 Quick Reference
 
-| Task | Command / Detail |
-|---|---|
-| Platform URL | `http://localhost` |
-| ATLAS URL | `http://localhost/atlas/` |
-| Grafana URL | `http://localhost/grafana` |
-| Default Login (Bridge) | `admin@omopbridge` / `admin` |
-| Default Login (ATLAS) | `admin` / `admin` |
-| Default Login (Grafana) | `admin` / `admin` |
-| Online deployment | `docker compose up -d` |
-| Pull updated images | `docker compose pull` |
-| Offline deployment | `./scripts/load_and_run.sh` |
-| Upgrade installation | `./scripts/upgrade.sh` |
-| Check services | `docker compose ps` |
-| View all logs | `docker compose logs -f` |
-| View backend logs | `docker compose logs -f backend` |
-| List Docker images | `docker images` |
-| List Docker volumes | `docker volume ls` |
-| Restart services | `docker compose restart` |
-| Stop without deleting data | `docker compose down` |
+| **Task**                                       | **Command / Detail**             |
+|------------------------------------------------| -------------------------------- |
+| Platform URL                                   | `http://localhost`               |
+| ATLAS URL                                      | `http://localhost/atlas/`        |
+| Grafana URL                                    | `http://localhost/grafana`       |
+| Default Login [username / password] (Bridge)   | `admin@omopbridge` / `admin`     |
+| Default Login [username / password]  (ATLAS)   | `admin` / `admin`                |
+| Default Login [username / password]  (Grafana) | `admin` / `admin`                |
+| Online deployment                              | `docker compose up -d`           |
+| Pull updated images                            | `docker compose pull`            |
+| Offline deployment                             | `./scripts/load_and_run.sh`      |
+| Upgrade repository                             | `git pull`                       |
+| Compare environment updates                    | `diff -u .env .env.sample`       |
+| Upgrade installation                           | `./scripts/upgrade.sh`           |
+| Check services                                 | `docker compose ps`              |
+| View all logs                                  | `docker compose logs -f`         |
+| View backend logs                              | `docker compose logs -f backend` |
+| List Docker images                             | `docker images`                  |
+| List Docker volumes                            | `docker volume ls`               |
+| Restart services                               | `docker compose restart`         |
+| Stop without deleting data                     | `docker compose down`            |
 
 ---
 
@@ -413,7 +441,7 @@ omop-bridge-docker/
 
 - Always back up critical production data before performing major upgrades.
 - Review release notes before upgrading.
-- Verify that the `.env` file is compatible with the new release.
+- Verify that the `.env` file is compatible with the new release by checking updates from `.env.sample`.
 - For offline deployments, ensure all image archives belong to the same OMOP Bridge release.
 - Do not delete Docker volumes unless you explicitly intend to remove persistent application data.
 - Avoid `docker compose down -v` in production unless volume deletion is intentional.
