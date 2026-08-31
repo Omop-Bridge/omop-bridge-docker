@@ -18,7 +18,7 @@ services:
     volumes:
       - omopbridge_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${TARGET_DB_USER:-omop}"]
+      test: ["CMD-SHELL", "pg_isready -U ${TARGET_DB_USER:-omop} -d ${TARGET_DB_NAME:-omop_cdm}"]
       interval: 5s
       timeout: 5s
       retries: 10
