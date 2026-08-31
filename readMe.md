@@ -219,6 +219,7 @@ New releases may introduce required configuration parameters in .env.sample. Com
 grep -E '^[A-Za-z_][A-Za-z0-9_]*=' .env.sample | while IFS= read -r line; do
     key="${line%%=*}"
     if ! grep -qE "^${key}=" .env; then
+        echo "" >> .env
         echo "$line" >> .env
     fi
 done
