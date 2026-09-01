@@ -177,7 +177,7 @@ Use the following default administrator credentials to log into the platform com
 
 | **Service**            | **Username**       | **Password** |
 | ---------------------- | ------------------ | ------------ |
-| **OMOP Bridge**        | `admin@omopbridge` | `admin`      |
+| **OMOP Bridge**        | `admin@omopbridge.org` | `admin`      |
 | **ATLAS Analytics**    | `admin`            | `admin`      |
 | **Grafana Monitoring** | `admin`            | `admin`      |
 
@@ -419,7 +419,7 @@ omop-bridge-docker/
 | Platform URL                                   | `http://localhost`               |
 | ATLAS URL                                      | `http://localhost/atlas/`        |
 | Grafana URL                                    | `http://localhost/grafana`       |
-| Default Login [username / password] (Bridge)   | `admin@omopbridge` / `admin`     |
+| Default Login [username / password] (Bridge)   | `admin@omopbridge.org` / `admin`     |
 | Default Login [username / password]  (ATLAS)   | `admin` / `admin`                |
 | Default Login [username / password]  (Grafana) | `admin` / `admin`                |
 | Online deployment                              | `docker compose up -d`           |
