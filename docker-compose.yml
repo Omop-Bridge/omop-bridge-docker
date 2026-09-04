@@ -1,7 +1,7 @@
 services:
   omop-bridge-db:
-    image: ${DB_IMAGE:-omop-bridge-db:local}
     container_name: omop-bridge-db
+    build: db
     restart: unless-stopped
     command: postgres -c max_connections=200
     environment:
@@ -18,7 +18,7 @@ services:
     volumes:
       - omopbridge_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${TARGET_DB_USER:-omop} -d ${TARGET_DB_NAME:-omop_cdm}"]
+      test: ["CMD-SHELL", "pg_isready -U ${TARGET_DB_USER:-omop} -d ${TARGET_DB_NAME:-omop_cdm} && psql -U ${TARGET_DB_USER:-omop} -d ${TARGET_DB_NAME:-omop_cdm} -c 'SELECT 1 FROM vocab.concept LIMIT 1;'"]
       interval: 5s
       timeout: 5s
       retries: 10
