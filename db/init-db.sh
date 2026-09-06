@@ -15,23 +15,23 @@ fi
 echo "Starting optimized OMOP compressed SQL database restore..."
 
 if [ -f "$DUMP_FILE" ]; then
-    FILE_SIZE=$(stat -c%s "$DUMP_FILE" 2>/dev/null || stat -f%z "$DUMP_FILE")
+    FILE_SIZE=$(stat -c%s "$DUMP_FILE" 2>/dev/null || stat -f%z "$DUMP_FILE" 2>/dev/null || echo "0")
 
+    echo "Dropping existing schemas to ensure a clean import..."
     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<-EOSQL
-        SET synchronous_commit = OFF;
-        ALTER SYSTEM SET maintenance_work_mem = '1GB';
-        ALTER SYSTEM SET max_wal_size = '4GB';
-        SELECT pg_reload_conf();
+    DROP SCHEMA IF EXISTS cdm CASCADE;
+    DROP SCHEMA IF EXISTS vocab CASCADE;
+    DROP SCHEMA IF EXISTS staging CASCADE;
 EOSQL
 
-    pv -s "$FILE_SIZE" "$DUMP_FILE" | gunzip | psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" --set ON_ERROR_STOP=1
+    # Session-level performance parameters (avoids ALTER SYSTEM permission/restart issues)
+    PGOPTIONS="-c synchronous_commit=off -c maintenance_work_mem=512MB"
 
-    echo "Import stream finished. Re-enabling safety settings and running vacuum..."
+    pv -s "$FILE_SIZE" "$DUMP_FILE" | gunzip | sed 's/CREATE SCHEMA /CREATE SCHEMA IF NOT EXISTS /g' | PGOPTIONS="$PGOPTIONS" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" --set ON_ERROR_STOP=1
 
-    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" <<-EOSQL
-        RESET synchronous_commit;
-        VACUUM ANALYZE;
-EOSQL
+    echo "Import stream finished. Running ANALYZE..."
+
+    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ANALYZE;"
 
     echo "OMOP compressed SQL database restore completed successfully!"
 else

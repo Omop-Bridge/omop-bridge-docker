@@ -5,15 +5,15 @@ echo "========================================================"
 echo "[INFO] Upgrading OMOP Bridge stack..."
 echo "========================================================"
 
-echo "[Step 1/3] Pulling latest base images..."
+echo "[Step 1/5] Pulling latest base images..."
 docker compose pull
 
-echo "[Step 2/3] Rebuilding container images and restarting services..."
-docker compose up --build -d
+echo "[Step 2/5] Rebuilding container images (ignoring cache)..."
+docker compose build --no-cache
 
-echo "[Step 3/3] Tailing database logs to monitor state..."
-echo "--------------------------------------------------------"
-echo "Tip: Press Ctrl+C at any time to exit logs (services will keep running)."
-echo "--------------------------------------------------------"
+echo "[Step 3/5] Restarting services with new builds..."
+docker compose up -d
 
-docker logs -f omop-bridge-db
+echo "[Step 4/5] Removing previously built unused/dangling images..."
+# The -f flag forces the removal without prompting for confirmation
+docker image prune -f

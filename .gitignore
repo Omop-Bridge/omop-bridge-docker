@@ -2,3 +2,4 @@
 /dockerImage/
 /faiss_indexes/
 .env
+omop_db_backup-002.tar.gz

@@ -16,12 +16,13 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - omopbridge_db_data:/var/lib/postgresql/data
+      - omop-bridge-docker_omopbridge_db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${TARGET_DB_USER:-omop} -d ${TARGET_DB_NAME:-omop_cdm} && psql -U ${TARGET_DB_USER:-omop} -d ${TARGET_DB_NAME:-omop_cdm} -c 'SELECT 1 FROM vocab.concept LIMIT 1;'"]
-      interval: 5s
+      test: [ "CMD-SHELL", "pg_isready -U omop -d omop_cdm -h localhost -p 5432 && psql -U omop -d omop_cdm -c 'SELECT count(*) FROM vocab.concept;' | grep -q '[1-9]' || exit 1" ]
+      interval: 10s
       timeout: 5s
-      retries: 10
+      retries: 30
+      start_period: 900s
     networks:
       - omop-bridge-network
 
@@ -288,7 +289,8 @@ services:
       - omop-bridge-network
 
 volumes:
-  omopbridge_db_data:
+  omop-bridge-docker_omopbridge_db_data:
+    external: true
   uploads:
   dqd_results:
   atlas3-webapi-data:

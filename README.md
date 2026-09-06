@@ -106,7 +106,7 @@ Make the lifecycle script executable and start the OMOP Bridge stack:
 Bash
 
 ```
-chmod +x scripts/start.sh
+chmod +x scripts/start.sh scripts/upgrade.sh scripts/stop.sh scripts/destroy.sh 
 ./scripts/start.sh
 
 ```
