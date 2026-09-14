@@ -2,6 +2,7 @@
 set -e
 
 DUMP_FILE="/docker-entrypoint-initdb.d/omop_vocab_baseline.sql.gz"
+INDEX_FILE="/docker-entrypoint-initdb.d/055_omop_bridge_performance_indexes.sql"
 
 # Skip the heavy import if the vocabulary baseline is already populated
 if psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT to_regclass('vocab.concept');" | grep -q "concept"; then
@@ -33,7 +34,12 @@ EOSQL
 
     psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "ANALYZE;"
 
-    echo "OMOP compressed SQL database restore completed successfully!"
+    if [ -f "$INDEX_FILE" ]; then
+        echo "Applying custom OMOP Bridge performance indexes..."
+        PGOPTIONS="$PGOPTIONS" psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" --set ON_ERROR_STOP=1 -f "$INDEX_FILE"
+    fi
+
+    echo "OMOP compressed SQL database restore and performance indexing completed successfully!"
 else
     echo "Error: Dump file not found at $DUMP_FILE"
     exit 1

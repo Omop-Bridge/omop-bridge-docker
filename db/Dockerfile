@@ -13,7 +13,7 @@ EXPOSE 5432
 
 # Copy the compressed plain SQL dump into the auto-execution directory
 COPY omop_vocab_baseline.sql.gz /docker-entrypoint-initdb.d/omop_vocab_baseline.sql.gz
-
+COPY omop_bridge_performance_indexes.sql /docker-entrypoint-initdb.d/omop_bridge_performance_indexes.sql
 # Copy the custom restoration shell script and make it executable
 COPY init-db.sh /docker-entrypoint-initdb.d/00-init-db.sh
 RUN chmod +x /docker-entrypoint-initdb.d/00-init-db.sh

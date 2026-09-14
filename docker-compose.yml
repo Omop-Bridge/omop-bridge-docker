@@ -36,7 +36,9 @@ services:
       TARGET_DB_PORT: 5432
       R_RUNNER_URL: http://r-runner:8001
       HF_TOKEN: ${HF_TOKEN}
+      HF_HUB_ENABLE_HF_TRANSFER: 1
       FAISS_INDEX_DIR: /app/data/faiss_indexes
+      OLLAMA_URL: "http://localhost:11434"
     extra_hosts:
       - "localhost:host-gateway"
     dns:
@@ -48,7 +50,7 @@ services:
     volumes:
       - uploads:/app/uploads
       - dqd_results:/results
-      - ./faiss_indexes:/app/data/faiss_indexes
+      - faiss_data:/app/data/faiss_indexes
     networks:
       - omop-bridge-network
 
@@ -205,6 +207,41 @@ services:
     networks:
       - omop-bridge-network
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: omop-bridge-ollama
+    restart: unless-stopped
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - omop-bridge-network
+
+  ollama-pull-model:
+    image: curlimages/curl:latest
+    container_name: omop-bridge-ollama-pull
+    networks:
+      - omop-bridge-network
+    depends_on:
+      - ollama
+    command: >
+      sh -c "
+        echo 'Waiting for Ollama to accept connections...';
+        until curl -s http://ollama:11434/api/tags > /dev/null; do sleep 2; done;
+
+        models='llama3.2:3b mistral:7b';
+        for model in $$models; do
+          echo 'Triggering automatic model pull for '$$model'...';
+          curl -s -X POST http://ollama:11434/api/pull -d '{\"name\": \"'$$model'\", \"stream\": false}';
+        done;
+
+        echo 'All consensus models pulled successfully!';
+      "
+
+
   nginx:
     image: nginx:alpine
     container_name: omop-bridge-nginx
@@ -300,6 +337,8 @@ volumes:
   frontend_node_modules:
   grafana_data:
   dbgate_data:
+  ollama_data:
+  faiss_data:
 
 networks:
   omop-bridge-network:
