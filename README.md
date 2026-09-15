@@ -27,7 +27,7 @@ Always use `git clone` to acquire the project repository. **Do not use GitHub's 
 Bash
 
 ```
-https://github.com/Omop-Bridge/omop-bridge-docker.git
+git clone https://github.com/Omop-Bridge/omop-bridge-docker.git
 cd omop-bridge-docker
 
 ```
