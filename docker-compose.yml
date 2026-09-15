@@ -16,7 +16,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - omop-bridge-docker_omopbridge_db_data:/var/lib/postgresql/data
+      - omopbridge_db_data:/var/lib/postgresql/data
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U omop -d omop_cdm -h localhost -p 5432 && psql -U omop -d omop_cdm -c 'SELECT count(*) FROM vocab.concept;' | grep -q '[1-9]' || exit 1" ]
       interval: 10s
@@ -88,6 +88,8 @@ services:
     image: nginx:alpine
     container_name: omop-bridge-ares
     restart: unless-stopped
+    ports:
+      - "8085:80"
     volumes:
       - dqd_results:/usr/share/nginx/html/data
     networks:
@@ -326,8 +328,7 @@ services:
       - omop-bridge-network
 
 volumes:
-  omop-bridge-docker_omopbridge_db_data:
-    external: true
+  omopbridge_db_data:
   uploads:
   dqd_results:
   atlas3-webapi-data:
