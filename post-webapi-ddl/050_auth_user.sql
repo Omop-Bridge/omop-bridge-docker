@@ -1,6 +1,7 @@
 -- DB-auth user table for WebAPI 3.0 AtlasRegularSecurity
 -- Schema matches org.ohdsi.webapi.security.authc.db.DatabaseUserDetailsService
 -- Default passwords: admin / admin, ohdsi / ohdsi (inherited from broadsea-atlasdb)
+
 CREATE TABLE IF NOT EXISTS webapi.auth_user (
     login VARCHAR(255) PRIMARY KEY,
     password_hash VARCHAR(255) NOT NULL,

@@ -1,8 +1,9 @@
 services:
   omop-bridge-db:
     container_name: omop-bridge-db
-    build: db
+    image: ${DB_IMAGE:-omop-bridge-db:local}
     restart: unless-stopped
+    entrypoint: ["/bin/bash", "/docker-entrypoint-initdb.d/entrypoint.sh"]
     command: postgres -c max_connections=200
     environment:
       POSTGRES_USER: ${TARGET_DB_USER:-omop}
@@ -17,8 +18,9 @@ services:
       - "5433:5432"
     volumes:
       - omopbridge_db_data:/var/lib/postgresql/data
+      - ./db:/docker-entrypoint-initdb.d
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U omop -d omop_cdm -h localhost -p 5432 && psql -U omop -d omop_cdm -c 'SELECT count(*) FROM vocab.concept;' | grep -q '[1-9]' || exit 1" ]
+      test: [ "CMD-SHELL", "pg_isready -U omop -d omop_cdm -h localhost -p 5432" ]
       interval: 10s
       timeout: 5s
       retries: 30
@@ -30,6 +32,7 @@ services:
     image: ${BACKEND_IMAGE:-omop-bridge-backend:local}
     container_name: omop-bridge-backend
     restart: unless-stopped
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     env_file: .env
     environment:
       TARGET_DB_HOST: omop-bridge-db
@@ -38,19 +41,25 @@ services:
       HF_TOKEN: ${HF_TOKEN}
       HF_HUB_ENABLE_HF_TRANSFER: 1
       FAISS_INDEX_DIR: /app/data/faiss_indexes
-      OLLAMA_URL: "http://localhost:11434"
+      OLLAMA_URL: "http://ollama:11434/api/generate"
     extra_hosts:
       - "localhost:host-gateway"
     dns:
       - 8.8.8.8
       - 1.1.1.1
     depends_on:
-      omop-bridge-db:
-        condition: service_healthy
+      - omop-bridge-db
+      - ollama
     volumes:
       - uploads:/app/uploads
       - dqd_results:/results
-      - faiss_data:/app/data/faiss_indexes
+      - ./faiss_indexes:/app/data/faiss_indexes
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8000/api/health || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     networks:
       - omop-bridge-network
 
@@ -107,7 +116,7 @@ services:
       - omop-bridge-network
 
   atlas3-webapi:
-    image: ${WEBAPI_IMAGE:-atlas3-webapi:local}
+    image: ${WEBAPI_IMAGE:-ohdsi/webapi:3.0.0}
     container_name: omop-bridge-atlas3-webapi
     platform: linux/amd64
     restart: unless-stopped
@@ -118,26 +127,35 @@ services:
       retries: 30
       start_period: 60s
     environment:
+      # --- DATABASE CONNECTION ---
       DATASOURCE_DRIVERCLASSNAME: org.postgresql.Driver
-      DATASOURCE_URL: jdbc:postgresql://omop-bridge-db:5432/omop_cdm?currentSchema=webapi
+      DATASOURCE_URL: ${DATASOURCE_URL}
       DATASOURCE_USERNAME: omop
-      DATASOURCE_PASSWORD: omop
+      DATASOURCE_PASSWORD: ${DATASOURCE_PASSWORD:-omop}
       DATASOURCE_OHDSI_SCHEMA: webapi
+
       SPRING_JPA_PROPERTIES_HIBERNATE_DEFAULT_SCHEMA: webapi
       SPRING_BATCH_REPOSITORY_TABLEPREFIX: webapi.batch_
-      FLYWAY_DATASOURCE_USERNAME: omop
-      FLYWAY_DATASOURCE_PASSWORD: omop
-      SPRING_FLYWAY_URL: jdbc:postgresql://omop-bridge-db:5432/omop_cdm?currentSchema=webapi
+
+      # --- FLYWAY MIGRATIONS ---
+      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_FLYWAY_URL: ${DATASOURCE_URL}
       SPRING_FLYWAY_USER: omop
-      SPRING_FLYWAY_PASSWORD: omop
+      SPRING_FLYWAY_PASSWORD: ${DATASOURCE_PASSWORD:-omop}
       SPRING_FLYWAY_SCHEMAS: webapi
+      SPRING_FLYWAY_DEFAULT_SCHEMA: webapi
       SPRING_FLYWAY_TABLE: flyway_schema_history
-      SPRING_FLYWAY_BASELINE_VERSION: "3.0.0"
+      #      SPRING_FLYWAY_OUT_OF_ORDER: "true"
+      SPRING_FLYWAY_VALIDATE_ON_MIGRATE: "true"
+      #      SPRING_FLYWAY_BASELINE_ON_MIGRATE: "true"
+      #      SPRING_FLYWAY_BASELINE_VERSION: "3.0.0"
       SPRING_FLYWAY_PLACEHOLDERS_OHDSISCHEMA: webapi
-      FLYWAY_BASELINE_VERSION: "3.0.0"
-      SPRING_FLYWAY_REPAIR_ON_MIGRATE: true
+
+      # --- CORS ---
       SECURITY_CORS_ENABLED: "true"
-      SECURITY_CORS_ALLOWED_ORIGINS: "http://localhost,https://localhost"
+      SECURITY_CORS_ALLOWED_ORIGINS: ${SECURITY_CORS_ALLOWED_ORIGINS:-http://localhost,https://localhost}
+
+      # --- AUTHENTICATION ---
       SECURITY_AUTH_DB_ENABLED: "true"
       SECURITY_AUTH_WINDOWS_ENABLED: "false"
       SECURITY_AUTH_KERBEROS_ENABLED: "false"
@@ -148,17 +166,26 @@ services:
       SECURITY_AUTH_LDAP_ENABLED: "false"
       SECURITY_AUTH_AD_ENABLED: "false"
       SECURITY_AUTH_CAS_ENABLED: "false"
+
       SECURITY_AUTH_OAUTH_CALLBACK_UI: "http://localhost/atlas/#/oauth/callback"
       SECURITY_AUTH_OAUTH_CALLBACK_API: "http://localhost:8080/WebAPI/user/oauth/callback"
+
+      # --- AUTH DATABASE ---
       SECURITY_AUTH_DB_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
-      SECURITY_AUTH_DB_DATASOURCE_URL: jdbc:postgresql://omop-bridge-db:5432/omop_cdm?currentSchema=webapi
+      SECURITY_AUTH_DB_DATASOURCE_URL: ${DATASOURCE_URL}
       SECURITY_AUTH_DB_DATASOURCE_USERNAME: omop
-      SECURITY_AUTH_DB_DATASOURCE_PASSWORD: omop
+      SECURITY_AUTH_DB_DATASOURCE_PASSWORD: ${DATASOURCE_PASSWORD:-omop}
       SECURITY_AUTH_DB_DATASOURCE_SCHEMA: webapi
+
+      # --- TREXSQL ---
       TREXSQL_ENABLED: "true"
       TREXSQL_CACHE_PATH: /data/cache
+
+      # --- RUNTIME ---
       HOME: /data
       AWS_REGION: us-east-1
+
+      # --- BAO AGENT ---
       BAO_AGENT_MODEL: ${BAO_AGENT_MODEL:-minimax.minimax-m2.5}
     env_file:
       - .env
@@ -170,29 +197,25 @@ services:
     networks:
       - omop-bridge-network
 
-  webapi-init:
+  atlas3-db-init:
     image: postgres:16-alpine
-    container_name: omop-bridge-webapi-init
+    container_name: atlas3-db-init
+    volumes:
+      - ./post-webapi-ddl:/scripts:ro
+    environment:
+      PGHOST: omop-bridge-db
+      PGUSER: omop
+      PGPASSWORD: ${DATASOURCE_PASSWORD:-omop}
+      PGDATABASE: omop_cdm
     depends_on:
       atlas3-webapi:
         condition: service_healthy
-    volumes:
-      - ./post-webapi-ddl:/scripts
-    command: >
-      sh -c "echo 'WebAPI is up and healthy. Executing post-startup SQL scripts from /scripts...' &&
-             until pg_isready -h omop-bridge-db -p 5432 -U omop; do sleep 2; done &&
-             for f in /scripts/*.sql; do
-               if [ -f \"$$f\" ]; then
-                 echo 'Running script: $$f' &&
-                 psql postgresql://omop:omop@omop-bridge-db:5432/omop_cdm -f \"$$f\" || exit 1;
-               fi;
-             done &&
-             echo 'All post-webapi-ddl scripts executed successfully!'"
+    command: sh -c 'for f in /scripts/*.sql; do psql -f "$$f"; done'
     networks:
       - omop-bridge-network
 
   atlas3-frontend:
-    image: ${ATLAS_FRONTEND_IMAGE:-omop-bridge-atlas3-frontend:local}
+    image: ${ATLAS_FRONTEND_IMAGE:-ghcr.io/ohdsi/atlas3:3.0.0}
     container_name: omop-bridge-atlas3-frontend
     platform: linux/amd64
     restart: unless-stopped
@@ -215,6 +238,7 @@ services:
     restart: unless-stopped
     environment:
       - OLLAMA_KEEP_ALIVE=24h
+      - OLLAMA_NUM_PARALLEL=2
     ports:
       - "11434:11434"
     volumes:
@@ -234,7 +258,7 @@ services:
         echo 'Waiting for Ollama to accept connections...';
         until curl -s http://ollama:11434/api/tags > /dev/null; do sleep 2; done;
 
-        models='llama3.2:3b mistral:7b';
+        for model in llama3.2:3b mistral:7b qwen2.5-coder:3b; do
         for model in $$models; do
           echo 'Triggering automatic model pull for '$$model'...';
           curl -s -X POST http://ollama:11434/api/pull -d '{\"name\": \"'$$model'\", \"stream\": false}';

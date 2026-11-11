@@ -214,7 +214,7 @@ The following default administrator credentials are provided for initial access:
 
 | **Service**            | **Username**           | **Password** |
 | ---------------------- | ---------------------- | ------------ |
-| **OMOP Bridge**        | `admin@omopbridge.org` | `admin`      |
+| **OMOP Bridge**        | `admin@omopbridge.com` | `admin`      |
 | **ATLAS Analytics**    | `admin`                | `admin`      |
 | **Grafana Monitoring** | `admin`                | `admin`      |
 
