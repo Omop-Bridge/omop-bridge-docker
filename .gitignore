@@ -4,3 +4,5 @@
 .env
 omop_db_backup-002.tar.gz
 omop_db_backup.tar.gz
+/db/athena_data/*
+!/db/athena_data/.gitignore
